@@ -1,6 +1,6 @@
 @import "tailwindcss";
 
-:root { color-scheme: dark; }
+:root { color-scheme: dark; --font-geist-sans: Arial, Helvetica, sans-serif; --font-geist-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace; }
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; }
 body { margin: 0; font-family: Arial, Helvetica, sans-serif; }
@@ -112,6 +112,12 @@ h1 em { display: block; color: var(--accent); font-style: normal; }
 .submit-button:hover { background: var(--accent-strong); transform: translateY(-1px); }
 .submit-button span { font-size: 16px; font-weight: 400; }
 .form-feedback { margin: -4px 0 0; color: #76bd9d; font-size: 10px; line-height: 1.5; }
+.form-error { color: #e08c98; }
+.text-button { align-self: center; padding: 2px; border: 0; background: transparent; color: var(--muted); font-size: 10px; cursor: pointer; }
+.text-button:hover { color: var(--text); text-decoration: underline; text-underline-offset: 3px; }
+.submit-button:disabled { opacity: .65; cursor: wait; transform: none; }
+.public-nickname { color: var(--accent); font-weight: 650; }
+.signout-button { width: 100%; cursor: pointer; }
 .terms { margin-top: 15px; color: var(--subtle); text-align: center; font-size: 8px; }
 .terms a { color: var(--muted); text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 2px; }
 .secure-note { display: flex; justify-content: center; align-items: center; gap: 7px; padding-top: 17px; margin-top: 18px; border-top: 1px solid var(--line); color: var(--subtle); font-size: 9px; }
