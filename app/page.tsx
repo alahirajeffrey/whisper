@@ -2,6 +2,9 @@
 
 import { useState } from "react";
 import type { FormEvent } from "react";
+import { useSignIn, useSignUp, useClerk } from "@clerk/nextjs";
+import { useConvexAuth, useMutation, useQuery } from "convex/react";
+import { api } from "@/convex/_generated/api";
 
 function WhisperMark() {
   return <span className="brand-mark" aria-hidden="true"><i /><i /><i /></span>;
@@ -18,17 +21,106 @@ function MoonIcon() {
 export default function Home() {
   const [theme, setTheme] = useState<"dark" | "light">("dark");
   const [mode, setMode] = useState<"signup" | "login">("signup");
-  const [submitted, setSubmitted] = useState(false);
+  const [authStep, setAuthStep] = useState<"details" | "verify" | "nickname">("details");
+  const [emailForCode, setEmailForCode] = useState("");
+  const [nickname, setNickname] = useState("");
+  const [authError, setAuthError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { signUp } = useSignUp();
+  const { signIn } = useSignIn();
+  const { signOut } = useClerk();
+  const { isAuthenticated } = useConvexAuth();
+  const profile = useQuery(api.users.currentProfile, isAuthenticated ? {} : "skip");
+  const saveNickname = useMutation(api.users.saveNickname);
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  function messageFromError(error: unknown) {
+    if (error instanceof Error) return error.message;
+    if (typeof error === "object" && error !== null && "errors" in error) {
+      const errors = error.errors;
+      if (Array.isArray(errors) && errors[0] && typeof errors[0].longMessage === "string") {
+        return errors[0].longMessage;
+      }
+    }
+    return "Something went wrong. Please try again.";
+  }
+
+  async function handleAuthSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setSubmitted(true);
+    setAuthError("");
+    setIsSubmitting(true);
+    const form = new FormData(event.currentTarget);
+    const emailAddress = String(form.get("email") ?? "").trim();
+    try {
+      if (mode === "signup") {
+        const firstName = String(form.get("firstName") ?? "").trim();
+        const lastName = String(form.get("lastName") ?? "").trim();
+        const { error } = await signUp.create({ emailAddress, firstName, lastName });
+        if (error) throw error;
+        const { error: verificationError } = await signUp.verifications.sendEmailCode();
+        if (verificationError) throw verificationError;
+      } else {
+        const { error } = await signIn.create({ identifier: emailAddress });
+        if (error) throw error;
+        const { error: verificationError } = await signIn.emailCode.sendCode({ emailAddress });
+        if (verificationError) throw verificationError;
+      }
+      setEmailForCode(emailAddress);
+      setAuthStep("verify");
+    } catch (error) {
+      setAuthError(messageFromError(error));
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  async function handleVerify(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setAuthError("");
+    setIsSubmitting(true);
+    const code = String(new FormData(event.currentTarget).get("code") ?? "").trim();
+    try {
+      if (mode === "signup") {
+        const { error } = await signUp.verifications.verifyEmailCode({ code });
+        if (error) throw error;
+        if (signUp.status !== "complete") throw new Error("Your account needs another verification step. Please try again.");
+        await signUp.finalize({ navigate: () => undefined });
+      } else {
+        const { error } = await signIn.emailCode.verifyCode({ code });
+        if (error) throw error;
+        if (signIn.status !== "complete") throw new Error("Your sign-in needs another verification step. Please try again.");
+        await signIn.finalize({ navigate: () => undefined });
+      }
+      setAuthStep("nickname");
+    } catch (error) {
+      setAuthError(messageFromError(error));
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  async function handleNicknameSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setAuthError("");
+    setIsSubmitting(true);
+    try {
+      await saveNickname({ nickname });
+    } catch (error) {
+      setAuthError(messageFromError(error));
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   function changeMode(next: "signup" | "login") {
     setMode(next);
-    setSubmitted(false);
+    setAuthStep("details");
+    setAuthError("");
   }
+
+  const needsNickname = isAuthenticated && profile === null;
+  const isChoosingNickname = isAuthenticated && (authStep === "nickname" || needsNickname);
+  const isFinishingSignIn = authStep === "nickname" && !isAuthenticated;
+  const isSignedInWithProfile = isAuthenticated && profile !== undefined && profile !== null;
 
   return (
     <main className="landing" data-theme={theme}>
@@ -73,29 +165,55 @@ export default function Home() {
 
         <aside className="join-card" id="join">
           <div className="join-card-top"><div className="join-icon">w.</div><span className="private-label"><span /> PRIVATE BY DESIGN</span></div>
-          <h2>{mode === "signup" ? "Start with a clean slate." : "Welcome back."}</h2>
-          <p className="form-intro">{mode === "signup" ? "A softer corner of the internet is waiting." : "Your quiet corner is right where you left it."}</p>
-          <div className="auth-tabs" role="tablist" aria-label="Account options">
-            <button role="tab" aria-selected={mode === "signup"} className={mode === "signup" ? "active" : ""} onClick={() => changeMode("signup")}>Create account</button>
-            <button role="tab" aria-selected={mode === "login"} className={mode === "login" ? "active" : ""} onClick={() => changeMode("login")}>Sign in</button>
-          </div>
-          <form className="auth-form" onSubmit={handleSubmit} key={mode}>
-            {mode === "signup" && <div className="name-row">
-              <label>First name<input name="firstName" placeholder="e.g. Jamie" autoComplete="given-name" required /></label>
-              <label>Last name<input name="lastName" placeholder="e.g. Taylor" autoComplete="family-name" required /></label>
-            </div>}
-            <label>Email address<input name="email" type="email" placeholder="you@example.com" autoComplete="email" required /></label>
-            {mode === "login" && <label>Password<input name="password" type="password" placeholder="Your password" autoComplete="current-password" required /></label>}
-            {mode === "signup" && <p className="privacy-note"><span>✳</span> Your name stays private. It will never appear beside what you share.</p>}
-            <button className="submit-button" type="submit">{mode === "signup" ? "Create your account" : "Sign in to Whisper"}<span aria-hidden="true">→</span></button>
-            {submitted && <p className="form-feedback" role="status">You’re all set to continue. Account access will be available soon.</p>}
-          </form>
+          {isFinishingSignIn ? <>
+            <h2>One moment…</h2>
+            <p className="form-intro">Finishing your secure sign-in.</p>
+          </> : isSignedInWithProfile ? <>
+            <h2>Welcome back.</h2>
+            <p className="form-intro">You’re here as <strong className="public-nickname">@{profile.nickname}</strong>. Your registration details stay private.</p>
+            <button className="submit-button signout-button" type="button" onClick={() => signOut()}><span>Sign out</span><span aria-hidden="true">↗</span></button>
+          </> : isChoosingNickname ? <>
+            <h2>Choose your nickname.</h2>
+            <p className="form-intro">This is the name people will see beside your posts. Your real name and email stay private.</p>
+            <form className="auth-form" onSubmit={handleNicknameSubmit}>
+              <label>Nickname<input name="nickname" value={nickname} onChange={(event) => setNickname(event.target.value)} placeholder="e.g. quietobserver" minLength={3} maxLength={20} pattern="[A-Za-z0-9_]{3,20}" autoComplete="off" required /></label>
+              <p className="privacy-note"><span>✳</span> 3–20 characters. Letters, numbers, and underscores only.</p>
+              {authError && <p className="form-feedback form-error" role="alert">{authError}</p>}
+              <button className="submit-button" type="submit" disabled={isSubmitting}>{isSubmitting ? "Saving…" : "Save nickname"}<span aria-hidden="true">→</span></button>
+            </form>
+          </> : authStep === "verify" ? <>
+            <h2>Check your inbox.</h2>
+            <p className="form-intro">Enter the one-time code we sent to <strong>{emailForCode}</strong>.</p>
+            <form className="auth-form" onSubmit={handleVerify}>
+              <label>Email verification code<input name="code" inputMode="numeric" autoComplete="one-time-code" placeholder="Enter your code" required /></label>
+              {authError && <p className="form-feedback form-error" role="alert">{authError}</p>}
+              <button className="submit-button" type="submit" disabled={isSubmitting}>{isSubmitting ? "Verifying…" : "Verify email"}<span aria-hidden="true">→</span></button>
+              <button className="text-button" type="button" onClick={() => { setAuthStep("details"); setAuthError(""); }}>Use a different email</button>
+            </form>
+          </> : <>
+            <h2>{mode === "signup" ? "Start with a clean slate." : "Welcome back."}</h2>
+            <p className="form-intro">{mode === "signup" ? "A softer corner of the internet is waiting." : "Your quiet corner is right where you left it."}</p>
+            <div className="auth-tabs" role="tablist" aria-label="Account options">
+              <button type="button" role="tab" aria-selected={mode === "signup"} className={mode === "signup" ? "active" : ""} onClick={() => changeMode("signup")}>Create account</button>
+              <button type="button" role="tab" aria-selected={mode === "login"} className={mode === "login" ? "active" : ""} onClick={() => changeMode("login")}>Sign in</button>
+            </div>
+            <form className="auth-form" onSubmit={handleAuthSubmit} key={mode}>
+              {mode === "signup" && <div className="name-row">
+                <label>First name<input name="firstName" placeholder="e.g. Jamie" autoComplete="given-name" required /></label>
+                <label>Last name<input name="lastName" placeholder="e.g. Taylor" autoComplete="family-name" required /></label>
+              </div>}
+              <label>Email address<input name="email" type="email" placeholder="you@example.com" autoComplete="email" required /></label>
+              {mode === "signup" && <p className="privacy-note"><span>✳</span> Your name stays private. It will never appear beside what you share.</p>}
+              {authError && <p className="form-feedback form-error" role="alert">{authError}</p>}
+              <button className="submit-button" type="submit" disabled={isSubmitting}>{isSubmitting ? "Sending code…" : mode === "signup" ? "Create your account" : "Email me a sign-in code"}<span aria-hidden="true">→</span></button>
+            </form>
+          </>}
           <div className="terms">By continuing, you agree to our <a href="#terms">Terms</a> and <a href="#privacy">Privacy Policy</a>.</div>
           <div className="secure-note"><span className="secure-shield">◇</span> Your words are yours. Your identity is always yours.</div>
         </aside>
       </section>
 
-      <footer className="page-footer" id="how-it-works"><span>© 2025 Whisper</span><span className="footer-center"><i /> Say what you need to say.</span><div><a href="#privacy">Privacy</a><a href="#guidelines">Community guidelines</a></div></footer>
+      <footer className="page-footer" id="how-it-works"><span>© 2026 Whisper</span><span className="footer-center"><i /> Say what you need to say.</span><div><a href="#privacy">Privacy</a><a href="#guidelines">Community guidelines</a></div></footer>
     </main>
   );
 }
