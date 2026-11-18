@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "convex-dev": "npx convex dev",
-    "convex-deploy": "npx convex deploy"
+    "convex-deploy": "npx convex deploy",
+    "convex-dashboard": "npx convex dashboard"
   },
   "dependencies": {
     "@clerk/nextjs": "^7.10.2",
