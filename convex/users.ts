@@ -1,9 +1,21 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 
+const avatarColor = v.union(
+  v.literal("sky"),
+  v.literal("violet"),
+  v.literal("mint"),
+  v.literal("coral"),
+  v.literal("gold"),
+  v.literal("rose"),
+);
+
 export const currentProfile = query({
   args: {},
-  returns: v.union(v.object({ nickname: v.string() }), v.null()),
+  returns: v.union(
+    v.object({ nickname: v.string(), avatarColor: v.union(avatarColor, v.null()) }),
+    v.null(),
+  ),
   handler: async (ctx) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) return null;
@@ -15,13 +27,15 @@ export const currentProfile = query({
       )
       .unique();
 
-    return profile ? { nickname: profile.nickname } : null;
+    return profile
+      ? { nickname: profile.nickname, avatarColor: profile.avatarColor ?? null }
+      : null;
   },
 });
 
-export const saveNickname = mutation({
-  args: { nickname: v.string() },
-  returns: v.object({ nickname: v.string() }),
+export const savePublicProfile = mutation({
+  args: { nickname: v.string(), avatarColor },
+  returns: v.object({ nickname: v.string(), avatarColor }),
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("You must be signed in to choose a nickname.");
@@ -39,10 +53,6 @@ export const saveNickname = mutation({
       )
       .unique();
 
-    if (existingProfile) {
-      return { nickname: existingProfile.nickname };
-    }
-
     const takenNickname = await ctx.db
       .query("profiles")
       .withIndex("by_normalized_nickname", (q) =>
@@ -50,14 +60,28 @@ export const saveNickname = mutation({
       )
       .unique();
 
-    if (takenNickname) throw new Error("That nickname is already taken.");
+    if (
+      takenNickname &&
+      takenNickname.tokenIdentifier !== identity.tokenIdentifier
+    ) {
+      throw new Error("That nickname is already taken.");
+    }
 
-    await ctx.db.insert("profiles", {
-      tokenIdentifier: identity.tokenIdentifier,
-      nickname,
-      normalizedNickname,
-    });
+    if (existingProfile) {
+      await ctx.db.patch(existingProfile._id, {
+        nickname,
+        normalizedNickname,
+        avatarColor: args.avatarColor,
+      });
+    } else {
+      await ctx.db.insert("profiles", {
+        tokenIdentifier: identity.tokenIdentifier,
+        nickname,
+        normalizedNickname,
+        avatarColor: args.avatarColor,
+      });
+    }
 
-    return { nickname };
+    return { nickname, avatarColor: args.avatarColor };
   },
 });
