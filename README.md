@@ -1,34 +1,38 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
-## Getting Started
+## Local development
 
-First, run the development server:
+Install dependencies once:
+
+```bash
+npm install
+```
+
+Start the app’s two local services in separate terminals:
+
+```bash
+npm run convex-dev
+```
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Then open [http://localhost:3000](http://localhost:3000). Clerk is hosted, so it does not need a local process. After initial setup, restarting only requires starting these two commands again.
 
 ## Clerk authentication
 
 1. Create a Clerk application and enable email sign-up and sign-in with email verification codes. Disable password sign-in; the Whisper forms use one-time email codes.
 2. Activate Clerk's Convex integration in the Clerk Dashboard and copy its Frontend API URL.
-3. Copy `.env.example` to `.env.local` and set `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `NEXT_PUBLIC_CONVEX_URL`, and `CLERK_JWT_ISSUER_DOMAIN` to the values for your Clerk and Convex apps.
-4. Set the issuer URL on the Convex deployment as well: `npx convex env set CLERK_JWT_ISSUER_DOMAIN <clerk-frontend-api-url>`.
-5. Run `npx convex dev` to publish the schema, auth configuration, and profile functions.
+3. Copy `.env.example` to `.env.local` and set `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` and `NEXT_PUBLIC_CONVEX_URL` for your Clerk and Convex apps.
+4. Set the Clerk Frontend API URL once on each Convex deployment: `npx convex env set CLERK_JWT_ISSUER_DOMAIN <clerk-frontend-api-url>`.
+5. Run `npm run convex-dev` to publish the schema, auth configuration, and profile functions to the selected dev deployment. Keep it running while developing.
 
-After a new user verifies their email, Whisper asks them to choose a unique nickname. First name, last name, and email stay in Clerk and are not returned by the Whisper profile query. The nickname is stored in Convex and is the public-facing identity for future posts.
+`CLERK_JWT_ISSUER_DOMAIN` is stored on the Convex deployment, so you do not set it again when restarting. A separate production deployment needs its own value.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+After a new user verifies their email, Whisper redirects them to `/onboarding/profile` to choose a unique nickname and avatar colour. First name, last name, and email stay in Clerk and are not returned by the Whisper profile query. The nickname and colour are stored in Convex as the public identity for future posts.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+You can start editing the landing page in `app/page.tsx`; the profile onboarding page is in `app/onboarding/profile/page.tsx`.
 
 ## Learn More
 
