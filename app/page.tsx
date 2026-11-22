@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
-import { useSignIn, useSignUp, useClerk } from "@clerk/nextjs";
+import { useSignIn, useSignUp } from "@clerk/nextjs";
 import { useConvexAuth, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useRouter } from "next/navigation";
@@ -44,7 +44,6 @@ export default function Home() {
   const router = useRouter();
   const { signUp } = useSignUp();
   const { signIn } = useSignIn();
-  const { signOut } = useClerk();
   const { isAuthenticated } = useConvexAuth();
   const profile = useQuery(
     api.users.currentProfile,
@@ -52,13 +51,10 @@ export default function Home() {
   );
 
   useEffect(() => {
-    if (
-      isAuthenticated &&
-      profile !== undefined &&
-      (!profile || profile.avatarColor === null)
-    ) {
-      router.replace("/onboarding/profile");
-    }
+    if (!isAuthenticated || profile === undefined) return;
+    router.replace(
+      profile?.avatarColor ? "/community" : "/onboarding/profile",
+    );
   }, [isAuthenticated, profile, router]);
 
   function messageFromError(error: unknown) {
@@ -155,7 +151,7 @@ export default function Home() {
             `Clerk requires another sign-in step (status: ${signIn.status}). If multi-factor authentication is enabled, complete its configured second factor in Clerk.`,
           );
         }
-        await signIn.finalize({ navigate: () => undefined });
+        await signIn.finalize({ navigate: () => router.push("/community") });
       }
     } catch (error) {
       setAuthError(messageFromError(error));
@@ -170,13 +166,7 @@ export default function Home() {
     setAuthError("");
   }
 
-  const isFinishingSignIn =
-    isAuthenticated && (profile === null || profile?.avatarColor === null);
-  const isSignedInWithProfile =
-    isAuthenticated &&
-    profile !== undefined &&
-    profile !== null &&
-    profile.avatarColor !== null;
+  const isFinishingSignIn = isAuthenticated;
 
   return (
     <main className="landing" data-theme={theme}>
@@ -221,7 +211,7 @@ export default function Home() {
               Find your quiet place <span aria-hidden="true">↗</span>
             </a>
             <span className="no-pressure">
-              <span className="lock-icon">⌑</span> No profiles. No pressure.
+              <span className="lock-icon">⌑</span> No real names. No pressure.
             </span>
           </div>
 
@@ -283,24 +273,7 @@ export default function Home() {
           {isFinishingSignIn ? (
             <>
               <h2>One moment…</h2>
-              <p className="form-intro">Opening your private profile setup.</p>
-            </>
-          ) : isSignedInWithProfile ? (
-            <>
-              <h2>Welcome back.</h2>
-              <p className="form-intro">
-                You’re here as{" "}
-                <strong className="public-nickname">@{profile.nickname}</strong>
-                . Your registration details stay private.
-              </p>
-              <button
-                className="submit-button signout-button"
-                type="button"
-                onClick={() => signOut()}
-              >
-                <span>Sign out</span>
-                <span aria-hidden="true">↗</span>
-              </button>
+              <p className="form-intro">Opening your community…</p>
             </>
           ) : authStep === "verify" ? (
             <>
