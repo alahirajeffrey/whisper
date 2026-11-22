@@ -30,9 +30,13 @@ Then open [http://localhost:3000](http://localhost:3000). Clerk is hosted, so it
 
 `CLERK_JWT_ISSUER_DOMAIN` is stored on the Convex deployment, so you do not set it again when restarting. A separate production deployment needs its own value.
 
-After a new user verifies their email, Whisper redirects them to `/onboarding/profile` to choose a unique nickname and avatar colour. First name, last name, and email stay in Clerk and are not returned by the Whisper profile query. The nickname and colour are stored in Convex as the public identity for future posts.
+Authentication uses email one-time codes for both sign-up and sign-in; there is no password field in the Whisper login flow. After a new user verifies their email, Whisper redirects them to `/onboarding/profile` to choose a unique nickname and avatar colour. Existing users with a completed profile go directly to `/community` after sign-in; new users go there after saving their profile. First name, last name, and email stay in Clerk and are not returned by the Whisper profile query. The nickname and colour are stored in Convex as the public identity for community posts.
 
-You can start editing the landing page in `app/page.tsx`; the profile onboarding page is in `app/onboarding/profile/page.tsx`.
+## Community
+
+The `/community` page is the signed-in home for anonymous posts. It supports a paginated feed, category filtering, live updates as posts are added, likes, comments and replies, and saving posts. Public post and comment data uses the user-selected nickname and avatar; account email and legal name are not exposed as public profile information. Convex stores the post, category, like, comment, and saved-post data.
+
+The landing and email-code login page is in `app/page.tsx`; profile onboarding is in `app/onboarding/profile/page.tsx`; community UI is in `app/community/page.tsx`; backend schema and functions are under `convex/`.
 
 ## Learn More
 
