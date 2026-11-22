@@ -19,4 +19,40 @@ export default defineSchema({
   })
     .index("by_token_identifier", ["tokenIdentifier"])
     .index("by_normalized_nickname", ["normalizedNickname"]),
+
+  posts: defineTable({
+    authorProfileId: v.id("profiles"),
+    authorTokenIdentifier: v.string(),
+    createdAt: v.number(),
+    body: v.string(),
+    category: v.string(),
+    likeCount: v.number(),
+    commentCount: v.number(),
+  })
+    .index("by_created_at", ["createdAt"])
+    .index("by_category_and_created_at", ["category", "createdAt"]),
+
+  postLikes: defineTable({
+    postId: v.id("posts"),
+    tokenIdentifier: v.string(),
+  })
+    .index("by_post_and_token", ["postId", "tokenIdentifier"])
+    .index("by_token_and_post", ["tokenIdentifier", "postId"]),
+
+  comments: defineTable({
+    postId: v.id("posts"),
+    parentCommentId: v.union(v.id("comments"), v.null()),
+    authorProfileId: v.id("profiles"),
+    authorTokenIdentifier: v.string(),
+    createdAt: v.number(),
+    body: v.string(),
+  })
+    .index("by_post_parent_and_created", ["postId", "parentCommentId", "createdAt"]),
+
+  savedPosts: defineTable({
+    postId: v.id("posts"),
+    tokenIdentifier: v.string(),
+  })
+    .index("by_token_and_post", ["tokenIdentifier", "postId"]),
+
 });
