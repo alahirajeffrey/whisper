@@ -40,7 +40,7 @@ export default function PublicProfilePage() {
   }, [isLoaded, isSignedIn, router]);
 
   useEffect(() => {
-    if (profile?.avatarColor) router.replace("/");
+    if (profile?.avatarColor) router.replace("/community");
   }, [profile, router]);
 
   useEffect(() => {
@@ -59,7 +59,7 @@ export default function PublicProfilePage() {
         nickname: nicknameValue,
         avatarColor: selectedAvatarColor,
       });
-      router.replace("/");
+      router.replace("/community");
     } catch (saveError) {
       setError(
         saveError instanceof Error
