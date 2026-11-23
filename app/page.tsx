@@ -52,9 +52,7 @@ export default function Home() {
 
   useEffect(() => {
     if (!isAuthenticated || profile === undefined) return;
-    router.replace(
-      profile?.avatarColor ? "/community" : "/onboarding/profile",
-    );
+    router.replace(profile?.avatarColor ? "/community" : "/onboarding/profile");
   }, [isAuthenticated, profile, router]);
 
   function messageFromError(error: unknown) {
@@ -179,10 +177,11 @@ export default function Home() {
             whisper<span className="brand-period">.</span>
           </span>
         </a>
+        {/* remove this navigation
         <nav className="top-nav" aria-label="Main navigation">
           <a href="#how-it-works">How it works</a>
           <a href="#community">Community</a>
-        </nav>
+        </nav> */}
         <button
           className="theme-toggle"
           onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
@@ -325,11 +324,12 @@ export default function Home() {
                   ? "Start with a clean slate."
                   : "Welcome back."}
               </h2>
-              <p className="form-intro">
+              {/* remove this */}
+              {/* <p className="form-intro">
                 {mode === "signup"
                   ? "A softer corner of the internet is waiting."
                   : "Your quiet corner is right where you left it."}
-              </p>
+              </p> */}
               <div
                 className="auth-tabs"
                 role="tablist"
