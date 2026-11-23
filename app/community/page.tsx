@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { FormEvent } from "react";
+import type { CSSProperties, FormEvent } from "react";
 import Link from "next/link";
 import { useAuth, useClerk } from "@clerk/nextjs";
 import {
@@ -14,14 +14,20 @@ import type { Id } from "@/convex/_generated/dataModel";
 import { api } from "@/convex/_generated/api";
 import { useRouter } from "next/navigation";
 
-const avatarColors: Record<string, string> = {
-  sky: "#8bbcff",
-  violet: "#a89af5",
-  mint: "#81c8ad",
-  coral: "#ed9c8d",
-  gold: "#e6bd69",
-  rose: "#dd91ae",
-};
+const avatarColors = [
+  { id: "sky", label: "Sky blue", value: "#8bbcff" },
+  { id: "violet", label: "Soft violet", value: "#a89af5" },
+  { id: "mint", label: "Sea glass", value: "#81c8ad" },
+  { id: "coral", label: "Coral", value: "#ed9c8d" },
+  { id: "gold", label: "Golden hour", value: "#e6bd69" },
+  { id: "rose", label: "Rose", value: "#dd91ae" },
+] as const;
+
+type AvatarColor = (typeof avatarColors)[number]["id"];
+
+const avatarColorMap: Record<string, string> = Object.fromEntries(
+  avatarColors.map((color) => [color.id, color.value]),
+);
 
 function Avatar({
   nickname,
@@ -33,7 +39,9 @@ function Avatar({
   return (
     <span
       className="community-avatar"
-      style={{ backgroundColor: avatarColors[color ?? "sky"] ?? avatarColors.sky }}
+      style={{
+        backgroundColor: avatarColorMap[color ?? "sky"] ?? avatarColorMap.sky,
+      }}
       aria-hidden="true"
     >
       {nickname.charAt(0).toUpperCase()}
@@ -121,11 +129,7 @@ function CommentReplies({
   );
 }
 
-function CommentThread({
-  postId,
-}: {
-  postId: Id<"posts">;
-}) {
+function CommentThread({ postId }: { postId: Id<"posts"> }) {
   const { results, status, loadMore } = usePaginatedQuery(
     api.comments.list,
     { postId, parentCommentId: null },
@@ -205,10 +209,7 @@ function CommentThread({
                 </div>
               </div>
               {replyingTo === comment._id && (
-                <CommentReplies
-                  postId={postId}
-                  parentCommentId={comment._id}
-                />
+                <CommentReplies postId={postId} parentCommentId={comment._id} />
               )}
             </div>
           ))}
@@ -305,8 +306,7 @@ function PostCard({
           aria-expanded={showComments}
         >
           <span aria-hidden="true">◷</span>
-          {post.commentCount}{" "}
-          {post.commentCount === 1 ? "comment" : "comments"}
+          {post.commentCount} {post.commentCount === 1 ? "comment" : "comments"}
         </button>
         <button
           className={`community-action community-save${post.viewer.saved ? " selected" : ""}`}
@@ -344,7 +344,13 @@ export default function CommunityPage() {
   const [postCategory, setPostCategory] = useState("");
   const [composerError, setComposerError] = useState("");
   const [isPosting, setIsPosting] = useState(false);
+  const [showProfileSettings, setShowProfileSettings] = useState(false);
+  const [nicknameDraft, setNicknameDraft] = useState<string | null>(null);
+  const [avatarColorDraft, setAvatarColorDraft] = useState<string | null>(null);
+  const [profileError, setProfileError] = useState("");
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
   const createPost = useMutation(api.posts.create);
+  const savePublicProfile = useMutation(api.users.savePublicProfile);
   const communityPosts = usePaginatedQuery(
     api.posts.list,
     { category },
@@ -369,6 +375,36 @@ export default function CommunityPage() {
   }, [isAuthenticated, isLoaded, isSignedIn, profile, router]);
 
   const activePostCategory = postCategory || categories?.[0]?.slug || "";
+
+  function openProfileSettings() {
+    setNicknameDraft(profile?.nickname ?? "");
+    setAvatarColorDraft(profile?.avatarColor ?? "sky");
+    setProfileError("");
+    setShowProfileSettings(true);
+  }
+
+  async function submitProfile(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setProfileError("");
+    setIsSavingProfile(true);
+    try {
+      await savePublicProfile({
+        nickname: nicknameDraft ?? profile?.nickname ?? "",
+        avatarColor: (avatarColorDraft ??
+          profile?.avatarColor ??
+          "sky") as AvatarColor,
+      });
+      setShowProfileSettings(false);
+    } catch (saveError) {
+      setProfileError(
+        saveError instanceof Error
+          ? saveError.message
+          : "Could not update your profile. Please try again.",
+      );
+    } finally {
+      setIsSavingProfile(false);
+    }
+  }
 
   async function submitPost(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -432,13 +468,127 @@ export default function CommunityPage() {
           </span>
         </Link>
         <div className="community-account">
-          <Avatar nickname={profile.nickname} color={profile.avatarColor} />
-          <span>@{profile.nickname}</span>
+          <button
+            className="community-profile-button"
+            type="button"
+            onClick={openProfileSettings}
+            aria-haspopup="dialog"
+          >
+            <Avatar nickname={profile.nickname} color={profile.avatarColor} />
+            <span>@{profile.nickname}</span>
+          </button>
           <button type="button" onClick={() => signOut({ redirectUrl: "/" })}>
             Sign out
           </button>
         </div>
       </header>
+
+      {showProfileSettings && (
+        <div
+          className="profile-settings-backdrop"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget)
+              setShowProfileSettings(false);
+          }}
+        >
+          <section
+            className="profile-settings"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="profile-settings-title"
+          >
+            <div className="profile-settings-header">
+              <div>
+                <span className="community-eyebrow">
+                  <span /> Public profile
+                </span>
+                <h2 id="profile-settings-title">Edit how you appear</h2>
+              </div>
+              <button
+                className="profile-settings-close"
+                type="button"
+                onClick={() => setShowProfileSettings(false)}
+                aria-label="Close profile settings"
+              >
+                ×
+              </button>
+            </div>
+
+            <form className="profile-settings-form" onSubmit={submitProfile}>
+              <div className="profile-settings-preview">
+                <Avatar
+                  nickname={nicknameDraft?.trim() || profile.nickname}
+                  color={avatarColorDraft || profile.avatarColor}
+                />
+                <div>
+                  <span>PREVIEW</span>
+                  <strong>@{nicknameDraft?.trim() || profile.nickname}</strong>
+                </div>
+              </div>
+
+              <label htmlFor="profile-nickname">Nickname</label>
+              <input
+                id="profile-nickname"
+                value={nicknameDraft ?? profile.nickname}
+                onChange={(event) => setNicknameDraft(event.target.value)}
+                minLength={3}
+                maxLength={20}
+                pattern="[A-Za-z0-9_]{3,20}"
+                autoComplete="off"
+                required
+              />
+              <span className="profile-settings-help">
+                3–20 characters · letters, numbers, and underscores
+              </span>
+
+              <fieldset className="profile-color-fieldset">
+                <legend>Avatar colour</legend>
+                <div className="profile-color-options">
+                  {avatarColors.map((color) => (
+                    <button
+                      key={color.id}
+                      type="button"
+                      className={
+                        avatarColorDraft === color.id ? "selected" : ""
+                      }
+                      style={{ "--swatch": color.value } as CSSProperties}
+                      aria-label={color.label}
+                      aria-pressed={avatarColorDraft === color.id}
+                      onClick={() => setAvatarColorDraft(color.id)}
+                    >
+                      <span />
+                    </button>
+                  ))}
+                </div>
+              </fieldset>
+
+              {profileError && (
+                <p className="community-error" role="alert">
+                  {profileError}
+                </p>
+              )}
+
+              <div className="profile-settings-actions">
+                <button
+                  className="profile-settings-cancel"
+                  type="button"
+                  onClick={() => setShowProfileSettings(false)}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="profile-settings-save"
+                  type="submit"
+                  disabled={isSavingProfile}
+                >
+                  {isSavingProfile ? "Saving…" : "Save changes"}
+                </button>
+              </div>
+            </form>
+          </section>
+        </div>
+      )}
 
       <div className="community-layout">
         <section className="community-main">
@@ -456,7 +606,9 @@ export default function CommunityPage() {
           </div>
 
           <form className="community-composer" onSubmit={submitPost}>
-            <label htmlFor="community-post">What would you like to share?</label>
+            <label htmlFor="community-post">
+              What would you like to share?
+            </label>
             <textarea
               id="community-post"
               value={body}
@@ -484,7 +636,10 @@ export default function CommunityPage() {
               <button
                 type="submit"
                 disabled={
-                  isPosting || !body.trim() || !activePostCategory || !categories
+                  isPosting ||
+                  !body.trim() ||
+                  !activePostCategory ||
+                  !categories
                 }
               >
                 {isPosting ? "Sharing…" : "Share post"}
@@ -520,7 +675,10 @@ export default function CommunityPage() {
               </button>
             </div>
             {section === "community" && (
-              <div className="community-filters" aria-label="Filter by category">
+              <div
+                className="community-filters"
+                aria-label="Filter by category"
+              >
                 <button
                   type="button"
                   className={category === "all" ? "selected" : ""}
@@ -552,7 +710,11 @@ export default function CommunityPage() {
             {posts.length === 0 && postStatus !== "LoadingFirstPage" && (
               <div className="community-empty">
                 <span aria-hidden="true">✳</span>
-                <h2>{section === "saved" ? "Nothing saved yet." : "A quiet moment."}</h2>
+                <h2>
+                  {section === "saved"
+                    ? "Nothing saved yet."
+                    : "A quiet moment."}
+                </h2>
                 <p>
                   {section === "saved"
                     ? "Save a post you want to come back to, and it will be waiting here."
